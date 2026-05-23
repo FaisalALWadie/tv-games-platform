@@ -21,11 +21,11 @@ const GAMES = [
     available: true,
   },
   {
-    id: 'game3-tbd',
-    name: 'قريباً',
-    description: 'لعبة جديدة قادمة',
-    players: '٢-١٠',
-    available: false,
+    id: 'game3-impostor',
+    name: 'من الإمبوستر؟',
+    description: 'لعبة الاكتشاف الاجتماعي',
+    players: '٣-١٠',
+    available: true,
   },
 ]
 

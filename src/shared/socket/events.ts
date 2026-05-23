@@ -36,3 +36,22 @@ export const FF_HOST_JUMP = 'FF_HOST_JUMP' as const
 export const FF_HOST_END = 'FF_HOST_END' as const
 export const FF_HOST_RESET_ATTEMPTS = 'FF_HOST_RESET_ATTEMPTS' as const
 export const FF_HOST_RESTART_SAME_TEAMS = 'FF_HOST_RESTART_SAME_TEAMS' as const
+
+// Impostor — room lifecycle
+export const IMP_CREATE = 'IMP_CREATE' as const
+export const IMP_JOIN = 'IMP_JOIN' as const
+export const IMP_HOST_RECONNECT = 'IMP_HOST_RECONNECT' as const
+export const IMP_RECONNECT = 'IMP_RECONNECT' as const
+export const IMP_STATE = 'IMP_STATE' as const
+export const IMP_ERROR = 'IMP_ERROR' as const
+export const IMP_WORD = 'IMP_WORD' as const
+
+// Impostor — game flow
+export const IMP_START = 'IMP_START' as const
+export const IMP_VOTE = 'IMP_VOTE' as const
+
+// Impostor — host controls
+export const IMP_HOST_START_VOTING = 'IMP_HOST_START_VOTING' as const
+export const IMP_HOST_NEXT = 'IMP_HOST_NEXT' as const
+export const IMP_HOST_END = 'IMP_HOST_END' as const
+export const IMP_HOST_RESTART = 'IMP_HOST_RESTART' as const
