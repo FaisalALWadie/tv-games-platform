@@ -10,15 +10,22 @@ const GAMES = [
     id: 'game1-horouf',
     name: 'حروف',
     description: 'لعبة الحروف والكلمات',
-    players: '٢-١٠',
+    players: '٢ فريق',
     available: true,
   },
   {
-    id: 'game2-tbd',
-    name: 'قريباً',
-    description: 'لعبة جديدة قادمة',
-    players: '٢-١٠',
-    available: false,
+    id: 'game2-family-feud',
+    name: 'عائلة فيود',
+    description: 'لعبة التنافس العائلي',
+    players: '٢-٢٠',
+    available: true,
+  },
+  {
+    id: 'game3-impostor',
+    name: 'من الإمبوستر؟',
+    description: 'لعبة الاكتشاف الاجتماعي',
+    players: '٣-١٠',
+    available: true,
   },
 ]
 

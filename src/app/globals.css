@@ -1,8 +1,72 @@
 @import "tailwindcss";
 
+@theme {
+  --color-bg-primary: #0A0A0F;
+  --color-bg-secondary: #12121A;
+  --color-bg-tertiary: #1A1A25;
+  --color-bg-surface: #22222F;
+  --color-text-primary: #F0F0F5;
+  --color-text-secondary: #9090A0;
+  --color-text-muted: #606070;
+  --color-accent-primary: #E8A838;
+  --color-accent-hover: #F0B848;
+  --color-success: #34D399;
+  --color-error: #F87171;
+  --color-warning: #FBBF24;
+  --color-border-default: #2A2A38;
+  --color-border-hover: #3A3A4A;
+}
+
+@utility hex-clip {
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  50%       { opacity: 0.7; filter: brightness(1.6); }
+}
+
+@keyframes scale-fade-in {
+  from { opacity: 0; transform: scale(0.5); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bounce-in {
+  0%   { opacity: 0; transform: scale(0.3); }
+  50%  { opacity: 1; transform: scale(1.05); }
+  70%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+@keyframes bg-pulse {
+  0%, 100% { opacity: 0.03; }
+  50%       { opacity: 0.08; }
+}
+
+@utility animate-scale-fade-in {
+  animation: scale-fade-in 600ms ease-out both;
+}
+
+@utility animate-fade-in-up {
+  animation: fade-in-up 300ms ease-out both;
+}
+
+@utility animate-bounce-in {
+  animation: bounce-in 600ms ease-out both;
+}
+
+@utility animate-bg-pulse {
+  animation: bg-pulse 3s ease-in-out infinite;
+}
+
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
+  --background: #0A0A0F;
+  --foreground: #F0F0F5;
 }
 
 body {
