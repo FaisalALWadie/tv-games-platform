@@ -30,7 +30,7 @@ function GameBoardContent() {
   )
 
   useEffect(() => {
-    const socket = io()
+    const socket = io({ reconnectionAttempts: Infinity, reconnectionDelay: 1000, reconnectionDelayMax: 5000 })
     socketRef.current = socket
 
     socket.on('connect', () => {

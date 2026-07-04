@@ -584,6 +584,8 @@ app.prepare().then(() => {
 
   const io = new SocketIOServer(httpServer, {
     cors: { origin: '*' },
+    pingTimeout: 30000,
+    pingInterval: 15000,
   })
 
   const rooms = new Map<string, Room>()
@@ -593,6 +595,7 @@ app.prepare().then(() => {
   const speedRooms = new Map<string, SpeedGameState>()
   const photoRooms = new Map<string, PhotoGameState>()
   const tabooRooms = new Map<string, TabooGameState>()
+  const disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   io.on('connection', (socket) => {
     socket.on(ROOM_CREATE, ({ gameId }: { gameId: string }) => {
@@ -1414,13 +1417,18 @@ app.prepare().then(() => {
     })
 
     socket.on('disconnect', () => {
-      handleLeave(socket.id, rooms, io)
-      handleFFLeave(socket.id, ffRooms, io)
-      handleImpLeave(socket.id, impRooms, io)
-      handleFastestLeave(socket.id, fastestRooms)
-      handleSpeedLeave(socket.id, speedRooms)
-      handlePhotoLeave(socket.id, photoRooms, io)
-      handleTabooLeave(socket.id, tabooRooms, io)
+      const sid = socket.id
+      const timer = setTimeout(() => {
+        disconnectTimers.delete(sid)
+        handleLeave(sid, rooms, io)
+        handleFFLeave(sid, ffRooms, io)
+        handleImpLeave(sid, impRooms, io)
+        handleFastestLeave(sid, fastestRooms)
+        handleSpeedLeave(sid, speedRooms)
+        handlePhotoLeave(sid, photoRooms, io)
+        handleTabooLeave(sid, tabooRooms, io)
+      }, 8000)
+      disconnectTimers.set(sid, timer)
     })
   })
 

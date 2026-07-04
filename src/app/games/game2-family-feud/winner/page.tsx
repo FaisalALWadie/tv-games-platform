@@ -14,7 +14,7 @@ function WinnerContent() {
   const [state, setState] = useState<RoomStatePayload | null>(null)
 
   useEffect(() => {
-    const socket = io()
+    const socket = io({ reconnectionAttempts: Infinity, reconnectionDelay: 1000, reconnectionDelayMax: 5000 })
     socket.on('connect', () => {
       socket.emit('FF_BOARD_JOIN', { roomCode: code })
     })

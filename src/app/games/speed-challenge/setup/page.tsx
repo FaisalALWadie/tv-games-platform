@@ -31,7 +31,7 @@ export default function SpeedChallengeSetupPage() {
     setLoading(true)
     setError('')
 
-    const socket = io()
+    const socket = io({ reconnectionAttempts: Infinity, reconnectionDelay: 1000, reconnectionDelayMax: 5000 })
     socket.on('connect', () => {
       socket.emit(SPEED_CREATE, { settings: { totalRounds, selectedCategories } })
     })

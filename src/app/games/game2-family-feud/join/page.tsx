@@ -35,7 +35,7 @@ function JoinContent() {
       return
     }
 
-    const socket = io()
+    const socket = io({ reconnectionAttempts: Infinity, reconnectionDelay: 1000, reconnectionDelayMax: 5000 })
     socketRef.current = socket
 
     // Just observe the room state without joining yet

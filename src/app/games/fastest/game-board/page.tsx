@@ -29,7 +29,7 @@ function GameBoardContent() {
 
   useEffect(() => {
     if (!code) return
-    const socket = io()
+    const socket = io({ reconnectionAttempts: Infinity, reconnectionDelay: 1000, reconnectionDelayMax: 5000 })
     socketRef.current = socket
     socket.on('connect', () => socket.emit(FASTEST_HOST_RECONNECT, { roomCode: code }))
     socket.on(FASTEST_STATE, (s: FastestStatePayload) => setState(s))
