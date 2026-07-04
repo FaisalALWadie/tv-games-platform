@@ -117,15 +117,13 @@ export const TABOO_JOIN = 'TABOO_JOIN' as const
 export const TABOO_STATE = 'TABOO_STATE' as const
 export const TABOO_ERROR = 'TABOO_ERROR' as const
 export const TABOO_CARD = 'TABOO_CARD' as const
-export const TABOO_GUESS_RESULT = 'TABOO_GUESS_RESULT' as const
 
 // Taboo Game — game flow
 export const TABOO_START = 'TABOO_START' as const
-export const TABOO_SUBMIT_CLUE = 'TABOO_SUBMIT_CLUE' as const
-export const TABOO_SUBMIT_GUESS = 'TABOO_SUBMIT_GUESS' as const
-export const TABOO_SKIP = 'TABOO_SKIP' as const
 
 // Taboo Game — host controls
+export const TABOO_HOST_AWARD = 'TABOO_HOST_AWARD' as const
+export const TABOO_HOST_SKIP = 'TABOO_HOST_SKIP' as const
 export const TABOO_HOST_END_TURN = 'TABOO_HOST_END_TURN' as const
 export const TABOO_HOST_NEXT = 'TABOO_HOST_NEXT' as const
 export const TABOO_HOST_END = 'TABOO_HOST_END' as const

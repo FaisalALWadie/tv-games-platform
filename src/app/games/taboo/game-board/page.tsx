@@ -5,8 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import { io, Socket } from 'socket.io-client'
 import {
   TABOO_CREATE, TABOO_HOST_RECONNECT, TABOO_STATE, TABOO_ERROR,
-  TABOO_START, TABOO_HOST_END_TURN, TABOO_HOST_NEXT,
-  TABOO_HOST_END, TABOO_HOST_RESTART,
+  TABOO_START, TABOO_HOST_AWARD, TABOO_HOST_SKIP,
+  TABOO_HOST_END_TURN, TABOO_HOST_NEXT, TABOO_HOST_END, TABOO_HOST_RESTART,
 } from '@/shared/socket/events'
 import type { TabooStatePayload } from '../types'
 import { PLAYER_COLOR_CLASSES } from '../types'
@@ -19,24 +19,14 @@ function GameBoardContent() {
 
   const [state, setState] = useState<TabooStatePayload | null>(null)
   const [error, setError] = useState('')
-  const [flashEvent, setFlashEvent] = useState<'buzz' | 'correct' | null>(null)
   const roomCodeRef = useRef(codeParam)
   const socketRef = useRef<Socket | null>(null)
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const emit = useCallback(
     (event: string, data: object = {}) =>
       socketRef.current?.emit(event, { roomCode: roomCodeRef.current, ...data }),
     []
   )
-
-  // Briefly show buzz/correct overlay then clear
-  useEffect(() => {
-    if (!state?.lastEvent) return
-    setFlashEvent(state.lastEvent)
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
-    flashTimerRef.current = setTimeout(() => setFlashEvent(null), 1800)
-  }, [state?.lastEvent, state?.clues.length, state?.turnScore])
 
   useEffect(() => {
     const socket = io()
@@ -80,9 +70,10 @@ function GameBoardContent() {
     </div>
   )
 
-  const { phase, players, settings, currentTurnIndex, totalTurns, clues, turnScore, winner } = state
+  const { phase, players, settings, currentTurnIndex, totalTurns, turnScore, winner } = state
   const clueGiver = players[currentTurnIndex % players.length]
   const currentRound = Math.floor(currentTurnIndex / players.length) + 1
+  const clueGiverColors = clueGiver ? PLAYER_COLOR_CLASSES[clueGiver.colorIndex % PLAYER_COLOR_CLASSES.length] : null
 
   // ── Lobby ──────────────────────────────────────────────────────────────────
   if (phase === 'lobby') {
@@ -165,28 +156,14 @@ function GameBoardContent() {
   }
 
   // ── Playing / Turn End ──────────────────────────────────────────────────────
-  const clueGiverColors = clueGiver ? PLAYER_COLOR_CLASSES[clueGiver.colorIndex % PLAYER_COLOR_CLASSES.length] : null
-
   return (
-    <div className="min-h-screen bg-zinc-950 text-white pb-32" dir="rtl">
-
-      {/* Flash overlay */}
-      {flashEvent && (
-        <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center pointer-events-none transition-opacity ${
-          flashEvent === 'buzz' ? 'bg-red-900/80' : 'bg-green-900/80'
-        }`}>
-          <p className="text-9xl mb-4">{flashEvent === 'buzz' ? '🚨' : '✅'}</p>
-          <p className="text-5xl font-black text-white">
-            {flashEvent === 'buzz' ? 'حرام!' : 'صح!'}
-          </p>
-        </div>
-      )}
-
+    <div className="min-h-screen bg-zinc-950 text-white pb-56" dir="rtl">
       <div className="max-w-5xl mx-auto px-4 pt-6">
+
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <p className="text-zinc-500 text-sm">
-            دور <span className="text-white font-bold">{currentRound}</span> / {settings.totalRounds}
+            جولة <span className="text-white font-bold">{currentRound}</span> / {settings.totalRounds}
             <span className="mx-2 text-zinc-700">·</span>
             دور <span className="text-white font-bold">{currentTurnIndex + 1}</span> / {totalTurns}
           </p>
@@ -197,7 +174,7 @@ function GameBoardContent() {
           <p className="text-zinc-600 text-xs font-mono">{state.roomCode}</p>
         </div>
 
-        {/* Scores */}
+        {/* Score dashboard */}
         <div className="flex flex-wrap gap-3 justify-center mb-6">
           {players.map((p) => {
             const c = PLAYER_COLOR_CLASSES[p.colorIndex % PLAYER_COLOR_CLASSES.length]
@@ -220,81 +197,87 @@ function GameBoardContent() {
 
         {/* Turn End summary */}
         {phase === 'turn_end' && clueGiver && (
-          <div className={`bg-zinc-900 border-2 ${clueGiverColors?.border ?? 'border-zinc-700'} rounded-2xl p-6 text-center mb-6`}>
+          <div className={`bg-zinc-900 border-2 ${clueGiverColors?.border ?? 'border-zinc-700'} rounded-2xl p-6 text-center`}>
             <p className="text-zinc-400 mb-1">انتهى دور</p>
             <p className={`text-3xl font-black mb-3 ${clueGiverColors?.text ?? 'text-white'}`}>{clueGiver.name}</p>
             <p className="text-zinc-300 text-xl">
-              كلمات صحيحة هذا الدور: <span className="text-white font-black text-3xl">{turnScore}</span>
+              نقاط هذا الدور: <span className="text-white font-black text-3xl">{turnScore}</span>
             </p>
           </div>
         )}
 
-        {/* Clues list */}
-        {phase === 'playing' && (
-          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-4 mb-4">
-            <div className="flex items-center gap-2 mb-3">
-              {clueGiverColors && (
-                <div className={`w-3 h-3 rounded-full ${clueGiverColors.bg}`} />
-              )}
-              <p className="text-zinc-400 text-sm">
-                المُلمِّح: <span className={`font-bold ${clueGiverColors?.text ?? 'text-white'}`}>{clueGiver?.name ?? '—'}</span>
-              </p>
-              <span className="mr-auto text-zinc-500 text-xs">
-                نقاط هذا الدور: <span className="text-white font-bold">{turnScore}</span>
-              </span>
-            </div>
-
-            {clues.length === 0 ? (
-              <p className="text-zinc-600 text-center py-6 text-sm">في انتظار الإشارات الأولى...</p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {[...clues].reverse().map((c, i) => (
-                  <div
-                    key={i}
-                    className={`flex items-start gap-3 px-4 py-2 rounded-xl text-sm ${
-                      c.valid ? 'bg-zinc-800 text-zinc-200' : 'bg-red-900/40 text-red-300'
-                    }`}
-                  >
-                    <span className="shrink-0 mt-0.5">{c.valid ? '💬' : '🚫'}</span>
-                    <span className="flex-1">{c.text}</span>
-                    {!c.valid && c.violatedWord && (
-                      <span className="shrink-0 text-red-400 text-xs font-bold">‹{c.violatedWord}›</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* Playing — current clue-giver card */}
+        {phase === 'playing' && clueGiver && (
+          <div className={`bg-zinc-900 border-2 ${clueGiverColors?.border ?? 'border-zinc-700'} rounded-2xl p-5 text-center`}>
+            <p className="text-zinc-400 text-sm mb-1">المُلمِّح الحالي</p>
+            <p className={`text-3xl font-black ${clueGiverColors?.text ?? 'text-white'}`}>
+              {clueGiver.name} 🎤
+            </p>
+            <p className="text-zinc-500 text-sm mt-2">
+              نقاط هذا الدور: <span className="text-white font-bold">{turnScore}</span>
+            </p>
           </div>
         )}
       </div>
 
-      {/* Host controls */}
-      <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t-4 border-indigo-500 px-4 py-3 z-40">
-        <div className="max-w-5xl mx-auto flex gap-3 justify-center">
+      {/* Host controls — fixed bottom bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t-4 border-indigo-500 px-4 py-4 z-40">
+        <div className="max-w-5xl mx-auto space-y-3">
+
           {phase === 'playing' && (
             <>
-              <button
-                onClick={() => emit(TABOO_HOST_END_TURN)}
-                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-colors text-lg"
-              >
-                إنهاء الدور
-              </button>
-              <button
-                onClick={() => emit(TABOO_HOST_END)}
-                className="px-6 py-3 bg-red-700 hover:bg-red-600 text-white font-bold rounded-2xl transition-colors"
-              >
-                🏁 إنهاء اللعبة
-              </button>
+              {/* Award buttons — one per team */}
+              <div>
+                <p className="text-zinc-400 text-xs text-center mb-2">من أجاب صح؟ — اضغط على الفريق الفائز بالنقطة</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {players.map((p) => {
+                    const c = PLAYER_COLOR_CLASSES[p.colorIndex % PLAYER_COLOR_CLASSES.length]
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => emit(TABOO_HOST_AWARD, { playerName: p.name })}
+                        className={`px-5 py-3 rounded-2xl font-bold text-white text-base transition-all active:scale-95 ${c.bg} ${c.btnHover}`}
+                      >
+                        نقطة لـ {p.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Secondary controls */}
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={() => emit(TABOO_HOST_SKIP)}
+                  className="px-5 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-bold rounded-2xl transition-colors text-sm"
+                >
+                  تخطي / خطأ ↩
+                </button>
+                <button
+                  onClick={() => emit(TABOO_HOST_END_TURN)}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-colors text-sm"
+                >
+                  إنهاء الدور
+                </button>
+                <button
+                  onClick={() => emit(TABOO_HOST_END)}
+                  className="px-4 py-2.5 bg-red-700 hover:bg-red-600 text-white font-bold rounded-2xl transition-colors text-sm"
+                >
+                  🏁 إنهاء
+                </button>
+              </div>
             </>
           )}
 
           {phase === 'turn_end' && (
-            <button
-              onClick={() => emit(TABOO_HOST_NEXT)}
-              className="px-10 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-colors text-lg"
-            >
-              الدور التالي ←
-            </button>
+            <div className="flex justify-center">
+              <button
+                onClick={() => emit(TABOO_HOST_NEXT)}
+                className="px-10 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-colors text-lg"
+              >
+                الدور التالي ←
+              </button>
+            </div>
           )}
         </div>
       </div>

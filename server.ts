@@ -58,9 +58,9 @@ import {
   PHOTO_START, PHOTO_HOST_REVEAL, PHOTO_HOST_AWARD, PHOTO_HOST_NEXT,
   PHOTO_HOST_END, PHOTO_HOST_RESTART,
   TABOO_CREATE, TABOO_HOST_RECONNECT, TABOO_JOIN,
-  TABOO_STATE, TABOO_ERROR, TABOO_CARD, TABOO_GUESS_RESULT,
-  TABOO_START, TABOO_SUBMIT_CLUE, TABOO_SUBMIT_GUESS, TABOO_SKIP,
-  TABOO_HOST_END_TURN, TABOO_HOST_NEXT, TABOO_HOST_END, TABOO_HOST_RESTART,
+  TABOO_STATE, TABOO_ERROR, TABOO_CARD,
+  TABOO_START,
+  TABOO_HOST_AWARD, TABOO_HOST_SKIP, TABOO_HOST_END_TURN, TABOO_HOST_NEXT, TABOO_HOST_END, TABOO_HOST_RESTART,
 } from './src/shared/socket/events'
 import { FAMILY_FEUD_QUESTIONS } from './src/app/games/game2-family-feud/questions'
 import { validateAnswer, buildExactCache } from './src/app/games/game2-family-feud/validation'
@@ -85,8 +85,8 @@ import type { SpeedPhase, SpeedSettings, SpeedPlayer, SpeedStatePayload, SpeedCh
 import { buildChallengePool } from './src/app/games/speed-challenge/challenges'
 import type { PhotoPhase, PhotoPlayer, PhotoSettings } from './src/app/games/photogame/types'
 import { pickRandomPhoto } from './src/app/games/photogame/categories'
-import type { TabooPhase, TabooPlayer, TabooSettings, TabooCard, ClueEntry } from './src/app/games/taboo/types'
-import { pickTabooCard, validateClue, validateGuess } from './src/app/games/taboo/words'
+import type { TabooPhase, TabooPlayer, TabooSettings, TabooCard } from './src/app/games/taboo/types'
+import { pickTabooCard } from './src/app/games/taboo/words'
 
 const port = parseInt(process.env.PORT || '3000', 10)
 const dev = process.env.NODE_ENV !== 'production'
@@ -169,9 +169,7 @@ interface TabooGameState {
   settings: TabooSettings
   players: TabooPlayer[]
   currentTurnIndex: number
-  clues: ClueEntry[]
   turnScore: number
-  lastEvent: 'buzz' | 'correct' | null
   winner: string | null
   currentCard: TabooCard | null
   usedCardIds: Set<number>
@@ -559,7 +557,7 @@ function emitTabooState(io: SocketIOServer, state: TabooGameState) {
     roomCode: state.roomCode, phase: state.phase, settings: state.settings,
     players: state.players, currentTurnIndex: state.currentTurnIndex,
     totalTurns: state.players.length * state.settings.totalRounds,
-    clues: state.clues, turnScore: state.turnScore, lastEvent: state.lastEvent, winner: state.winner,
+    turnScore: state.turnScore, winner: state.winner,
   })
 }
 
@@ -567,7 +565,6 @@ function sendCardToClueGiver(io: SocketIOServer, state: TabooGameState) {
   const card = pickTabooCard(state.settings.difficulty, state.usedCardIds)
   state.usedCardIds.add(card.id)
   state.currentCard = card
-  state.clues = []
   const clueGiver = state.players[state.currentTurnIndex % state.players.length]
   const sock = clueGiver ? io.sockets.sockets.get(clueGiver.socketId) : undefined
   if (sock) sock.emit(TABOO_CARD, { targetWord: card.targetWord, tabooWords: card.tabooWords })
@@ -1332,8 +1329,8 @@ app.prepare().then(() => {
       const code = generateTabooCode(tabooRooms)
       const state: TabooGameState = {
         roomCode: code, hostSocketId: socket.id, phase: 'lobby', settings,
-        players: [], currentTurnIndex: 0, clues: [], turnScore: 0,
-        lastEvent: null, winner: null, currentCard: null, usedCardIds: new Set(),
+        players: [], currentTurnIndex: 0, turnScore: 0,
+        winner: null, currentCard: null, usedCardIds: new Set(),
       }
       tabooRooms.set(code, state); socket.join(code); emitTabooState(io, state)
     })
@@ -1366,46 +1363,23 @@ app.prepare().then(() => {
       const state = tabooRooms.get(roomCode)
       if (!state || state.hostSocketId !== socket.id) return
       if (state.players.length < 2) { socket.emit(TABOO_ERROR, { message: 'يجب وجود لاعبَين على الأقل' }); return }
-      state.phase = 'playing'; state.currentTurnIndex = 0; state.turnScore = 0; state.lastEvent = null
+      state.phase = 'playing'; state.currentTurnIndex = 0; state.turnScore = 0
       sendCardToClueGiver(io, state); emitTabooState(io, state)
     })
 
-    socket.on(TABOO_SUBMIT_CLUE, ({ roomCode, clue }: { roomCode: string; clue: string }) => {
+    socket.on(TABOO_HOST_AWARD, ({ roomCode, playerName }: { roomCode: string; playerName: string }) => {
       const state = tabooRooms.get(roomCode)
-      if (!state || state.phase !== 'playing' || !state.currentCard) return
-      const cg = state.players[state.currentTurnIndex % state.players.length]
-      if (!cg || cg.socketId !== socket.id) return
-      const trimmed = clue.trim(); if (!trimmed) return
-      const result = validateClue(trimmed, state.currentCard)
-      if (!result.valid) {
-        state.clues.push({ text: trimmed, valid: false, violatedWord: result.violatedWord })
-        state.lastEvent = 'buzz'; emitTabooState(io, state)
-        sendCardToClueGiver(io, state); emitTabooState(io, state)
-      } else {
-        state.clues.push({ text: trimmed, valid: true }); state.lastEvent = null; emitTabooState(io, state)
-      }
+      if (!state || state.hostSocketId !== socket.id || state.phase !== 'playing') return
+      const player = state.players.find((p) => p.name === playerName)
+      if (!player) return
+      player.score += 1; state.turnScore += 1
+      sendCardToClueGiver(io, state); emitTabooState(io, state)
     })
 
-    socket.on(TABOO_SUBMIT_GUESS, ({ roomCode, guess }: { roomCode: string; guess: string }) => {
+    socket.on(TABOO_HOST_SKIP, ({ roomCode }: { roomCode: string }) => {
       const state = tabooRooms.get(roomCode)
-      if (!state || state.phase !== 'playing' || !state.currentCard) return
-      const cg = state.players[state.currentTurnIndex % state.players.length]
-      if (!cg || cg.socketId === socket.id) return
-      const trimmed = guess.trim(); if (!trimmed) return
-      const correct = validateGuess(trimmed, state.currentCard.targetWord)
-      socket.emit(TABOO_GUESS_RESULT, { correct })
-      if (correct) {
-        cg.score += 1; state.turnScore += 1; state.lastEvent = 'correct'
-        sendCardToClueGiver(io, state); emitTabooState(io, state)
-      }
-    })
-
-    socket.on(TABOO_SKIP, ({ roomCode }: { roomCode: string }) => {
-      const state = tabooRooms.get(roomCode)
-      if (!state || state.phase !== 'playing') return
-      const cg = state.players[state.currentTurnIndex % state.players.length]
-      if (!cg || cg.socketId !== socket.id) return
-      state.lastEvent = null; sendCardToClueGiver(io, state); emitTabooState(io, state)
+      if (!state || state.hostSocketId !== socket.id || state.phase !== 'playing') return
+      sendCardToClueGiver(io, state); emitTabooState(io, state)
     })
 
     socket.on(TABOO_HOST_END_TURN, ({ roomCode }: { roomCode: string }) => {
@@ -1420,7 +1394,7 @@ app.prepare().then(() => {
       const totalTurns = state.players.length * state.settings.totalRounds
       state.currentTurnIndex += 1
       if (state.currentTurnIndex >= totalTurns) { finishTabooGame(io, state); return }
-      state.phase = 'playing'; state.turnScore = 0; state.lastEvent = null
+      state.phase = 'playing'; state.turnScore = 0
       sendCardToClueGiver(io, state); emitTabooState(io, state)
     })
 
@@ -1433,8 +1407,8 @@ app.prepare().then(() => {
     socket.on(TABOO_HOST_RESTART, ({ roomCode }: { roomCode: string }) => {
       const state = tabooRooms.get(roomCode)
       if (!state || state.hostSocketId !== socket.id) return
-      state.phase = 'lobby'; state.currentTurnIndex = 0; state.clues = []
-      state.turnScore = 0; state.lastEvent = null; state.winner = null
+      state.phase = 'lobby'; state.currentTurnIndex = 0
+      state.turnScore = 0; state.winner = null
       state.currentCard = null; state.usedCardIds.clear()
       state.players.forEach((p) => { p.score = 0 }); emitTabooState(io, state)
     })

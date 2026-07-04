@@ -27,12 +27,6 @@ export const DEFAULT_TABOO_SETTINGS: TabooSettings = {
   difficulty: 'Medium',
 }
 
-export interface ClueEntry {
-  text: string
-  valid: boolean
-  violatedWord?: string
-}
-
 export interface TabooStatePayload {
   roomCode: string
   phase: TabooPhase
@@ -40,9 +34,7 @@ export interface TabooStatePayload {
   players: TabooPlayer[]
   currentTurnIndex: number
   totalTurns: number
-  clues: ClueEntry[]
   turnScore: number
-  lastEvent: 'buzz' | 'correct' | null
   winner: string | null
 }
 

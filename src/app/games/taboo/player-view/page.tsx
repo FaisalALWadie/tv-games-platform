@@ -4,9 +4,7 @@ import { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { io, Socket } from 'socket.io-client'
 import {
-  TABOO_JOIN, TABOO_STATE, TABOO_ERROR,
-  TABOO_CARD, TABOO_GUESS_RESULT,
-  TABOO_SUBMIT_CLUE, TABOO_SUBMIT_GUESS, TABOO_SKIP,
+  TABOO_JOIN, TABOO_STATE, TABOO_ERROR, TABOO_CARD,
 } from '@/shared/socket/events'
 import type { TabooStatePayload } from '../types'
 import { PLAYER_COLOR_CLASSES } from '../types'
@@ -22,26 +20,18 @@ function PlayerViewContent() {
   const [teamInput, setTeamInput] = useState('')
   const [joined, setJoined] = useState(false)
   const [myTeam, setMyTeam] = useState('')
-
   const [card, setCard] = useState<CardPayload | null>(null)
-  const [clueInput, setClueInput] = useState('')
-  const [guessInput, setGuessInput] = useState('')
-  const [guessResult, setGuessResult] = useState<boolean | null>(null)
-  const guessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Refs hold the latest values without re-triggering useEffect
   const socketRef = useRef<Socket | null>(null)
   const joinedRef = useRef(false)
   const myTeamRef = useRef('')
 
-  // Single socket lifecycle — only recreated if code changes
   useEffect(() => {
     if (!code) return
     const socket = io()
     socketRef.current = socket
 
     socket.on('connect', () => {
-      // Re-join automatically on reconnect (e.g. page refresh, network drop)
       if (joinedRef.current && myTeamRef.current) {
         socket.emit(TABOO_JOIN, { roomCode: code, playerName: myTeamRef.current })
       }
@@ -49,25 +39,10 @@ function PlayerViewContent() {
 
     socket.on(TABOO_STATE, (s: TabooStatePayload) => {
       setState(s)
-      if (s.phase !== 'playing') {
-        setCard(null)
-        setClueInput('')
-        setGuessInput('')
-      }
+      if (s.phase !== 'playing') setCard(null)
     })
 
-    socket.on(TABOO_CARD, (payload: CardPayload) => {
-      setCard(payload)
-      setClueInput('')
-    })
-
-    socket.on(TABOO_GUESS_RESULT, ({ correct }: { correct: boolean }) => {
-      setGuessResult(correct)
-      if (correct) setGuessInput('')
-      if (guessTimerRef.current) clearTimeout(guessTimerRef.current)
-      guessTimerRef.current = setTimeout(() => setGuessResult(null), 1500)
-    })
-
+    socket.on(TABOO_CARD, (payload: CardPayload) => setCard(payload))
     socket.on(TABOO_ERROR, ({ message }: { message: string }) => setError(message))
 
     return () => { socket.disconnect() }
@@ -83,25 +58,6 @@ function PlayerViewContent() {
     socketRef.current?.emit(TABOO_JOIN, { roomCode: code, playerName: team })
   }
 
-  function emit(event: string, data: object = {}) {
-    socketRef.current?.emit(event, { roomCode: code, ...data })
-  }
-
-  function submitClue() {
-    const text = clueInput.trim()
-    if (!text) return
-    emit(TABOO_SUBMIT_CLUE, { clue: text })
-    setClueInput('')
-  }
-
-  function submitGuess() {
-    const text = guessInput.trim()
-    if (!text) return
-    emit(TABOO_SUBMIT_GUESS, { guess: text })
-    setGuessInput('')
-  }
-
-  // ── Error ──────────────────────────────────────────────────────────────────
   if (error) return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center" dir="rtl">
       <div className="text-center px-6">
@@ -111,7 +67,6 @@ function PlayerViewContent() {
     </div>
   )
 
-  // ── Join screen ────────────────────────────────────────────────────────────
   if (!joined) return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6" dir="rtl">
       <p className="text-5xl mb-3">🚫</p>
@@ -139,7 +94,6 @@ function PlayerViewContent() {
     </div>
   )
 
-  // ── Loading (waiting for first state) ─────────────────────────────────────
   if (!state) return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
       <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
@@ -182,7 +136,7 @@ function PlayerViewContent() {
     <div className={`min-h-screen flex flex-col items-center justify-center p-6 ${myColors?.phoneBg ?? 'bg-zinc-800'}`} dir="rtl">
       <p className="text-white text-3xl font-black mb-2">{myTeam}</p>
       <p className="text-white/70 text-lg mb-4">
-        {isClueGiver ? `سجّلت ${state.turnScore} نقطة هذا الدور 🎉` : `انتهى دور ${clueGiver?.name ?? ''}`}
+        {isClueGiver ? `سجّل الهوست نقاطك لهذا الدور 🎉` : `انتهى دور ${clueGiver?.name ?? ''}`}
       </p>
       <p className="text-white/40 text-sm">في انتظار الدور التالي...</p>
       <p className={`mt-6 text-xl font-black ${myColors?.text ?? 'text-white'}`}>
@@ -191,7 +145,7 @@ function PlayerViewContent() {
     </div>
   )
 
-  // ── Playing — Clue-giver ───────────────────────────────────────────────────
+  // ── Playing — Clue-giver: show card, no text input ─────────────────────────
   if (isClueGiver) return (
     <div className="min-h-screen bg-zinc-950 flex flex-col" dir="rtl">
       <div className={`px-5 pt-5 pb-3 ${myColors?.phoneBg ?? 'bg-zinc-800'}`}>
@@ -200,10 +154,10 @@ function PlayerViewContent() {
           <p className="text-white/60 text-sm">جولة {currentRound}/{state.settings.totalRounds}</p>
           <p className="text-white font-bold">{myPlayer?.score ?? 0} نقطة</p>
         </div>
-        <p className="text-white/50 text-center text-xs mt-2">وصّف الكلمة بدون ما تقول الكلمات الحمراء</p>
+        <p className="text-white/50 text-center text-xs mt-2">وصّف الكلمة شفهياً — بدون ما تقول الكلمات الحمراء</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-36">
+      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-8">
         {card ? (
           <>
             <div className="bg-zinc-900 border-2 border-indigo-500 rounded-2xl p-5 mb-4 text-center">
@@ -211,7 +165,7 @@ function PlayerViewContent() {
               <p className="text-4xl font-black text-white">{card.targetWord}</p>
             </div>
 
-            <div className="bg-zinc-900 border-2 border-red-700 rounded-2xl p-4 mb-4">
+            <div className="bg-zinc-900 border-2 border-red-700 rounded-2xl p-4">
               <p className="text-red-400 text-xs font-bold mb-3 text-center">🚫 ممنوع تقولها</p>
               <div className="grid grid-cols-2 gap-2">
                 {card.tabooWords.map((w) => (
@@ -221,19 +175,6 @@ function PlayerViewContent() {
                 ))}
               </div>
             </div>
-
-            {state.clues.length > 0 && (
-              <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-3">
-                <p className="text-zinc-500 text-xs mb-2">إشاراتك</p>
-                {state.clues.map((c, i) => (
-                  <div key={i} className={`text-sm px-3 py-1 flex gap-2 ${c.valid ? 'text-zinc-300' : 'text-red-400 line-through'}`}>
-                    <span>{c.valid ? '💬' : '🚫'}</span>
-                    <span>{c.text}</span>
-                    {!c.valid && c.violatedWord && <span className="text-red-500 text-xs mr-auto">‹{c.violatedWord}›</span>}
-                  </div>
-                ))}
-              </div>
-            )}
           </>
         ) : (
           <div className="flex items-center justify-center h-40">
@@ -241,87 +182,26 @@ function PlayerViewContent() {
           </div>
         )}
       </div>
-
-      <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-700 px-4 py-3 space-y-2">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={clueInput}
-            onChange={(e) => setClueInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submitClue()}
-            placeholder="اكتب إشارة..."
-            className="flex-1 bg-zinc-800 border border-zinc-600 rounded-xl px-4 py-2 text-white text-right focus:outline-none focus:border-indigo-500"
-          />
-          <button
-            onClick={submitClue}
-            disabled={!clueInput.trim()}
-            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold px-5 py-2 rounded-xl transition-colors"
-          >
-            إرسال
-          </button>
-        </div>
-        <button
-          onClick={() => emit(TABOO_SKIP)}
-          className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-bold py-2 rounded-xl transition-colors text-sm"
-        >
-          تخطّ الكلمة ↩
-        </button>
-      </div>
     </div>
   )
 
-  // ── Playing — Guesser ──────────────────────────────────────────────────────
+  // ── Playing — Guesser: verbal only, no text input ──────────────────────────
   return (
-    <div className={`min-h-screen flex flex-col ${myColors?.phoneBg ?? 'bg-zinc-800'}`} dir="rtl">
-      <div className="flex items-center justify-between px-5 pt-5 pb-3">
-        <p className="text-white font-black text-xl">{myTeam}</p>
+    <div className={`min-h-screen flex flex-col items-center justify-center p-6 ${myColors?.phoneBg ?? 'bg-zinc-800'}`} dir="rtl">
+      <div className="flex items-center justify-between w-full mb-8">
+        <p className="text-white font-black text-lg">{myTeam}</p>
         <p className="text-white/60 text-sm">جولة {currentRound}/{state.settings.totalRounds}</p>
         <p className="text-white font-bold">{myPlayer?.score ?? 0} نقطة</p>
       </div>
-      <p className="text-white/70 text-center text-sm mb-1">المُلمِّح: <span className="font-black">{clueGiver?.name ?? '—'}</span></p>
-      <p className="text-white/40 text-center text-xs mb-4">خمّن الكلمة من الإشارات</p>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-28">
-        {state.clues.length === 0 ? (
-          <div className="flex items-center justify-center h-32">
-            <p className="text-white/30 text-sm">في انتظار الإشارات...</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {[...state.clues].reverse().map((c, i) => (
-              <div key={i} className={`px-4 py-3 rounded-xl font-medium ${c.valid ? 'bg-white/10 text-white' : 'bg-red-900/30 text-red-400 line-through'}`}>
-                {c.text}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {guessResult !== null && (
-        <div className={`fixed top-4 left-4 right-4 z-50 py-3 rounded-2xl text-center font-black text-lg ${guessResult ? 'bg-green-600' : 'bg-red-700'} text-white`}>
-          {guessResult ? '✅ صح! نقطة لك' : '❌ خطأ — حاول مرة أخرى'}
-        </div>
-      )}
-
-      <div className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 border-t border-zinc-700 px-4 py-3">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={guessInput}
-            onChange={(e) => setGuessInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submitGuess()}
-            placeholder="ما هي الكلمة؟"
-            className="flex-1 bg-zinc-800 border border-zinc-600 rounded-xl px-4 py-2 text-white text-right focus:outline-none focus:border-green-500"
-          />
-          <button
-            onClick={submitGuess}
-            disabled={!guessInput.trim()}
-            className="bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white font-bold px-5 py-2 rounded-xl transition-colors"
-          >
-            تخمين
-          </button>
-        </div>
-      </div>
+      <p className="text-6xl mb-4">👂</p>
+      <p className="text-white font-black text-2xl mb-2">استمع وخمّن!</p>
+      <p className="text-white/60 text-center text-base mb-6">
+        المُلمِّح: <span className="font-black text-white">{clueGiver?.name ?? '—'}</span>
+      </p>
+      <p className="text-white/30 text-sm text-center">
+        خمّن الكلمة شفهياً — الهوست يسجّل النقاط
+      </p>
     </div>
   )
 }
